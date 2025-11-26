@@ -392,19 +392,19 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <!-- Mammoth.js for parsing DOCX files -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
-
+    
     <!-- Main Application JavaScript -->
     <script>
         document.addEventListener('DOMContentLoaded', function() {
             // --- CONFIGURATION ---
             // IMPORTANT: Replace 'YOUR_GEMINI_API_KEY' with your actual API key from Google AI Studio.
-            const GEMINI_API_KEY = 'AIzaSyDLODIUPVgot-LQ_iL91p-Et-5u-5tsM5Y';
+            const GEMINI_API_KEY = 'AIzaSyDLODIUPVgot-LQ_iL91p-Et-5u-5tsM5Y'; // This should be replaced by the script
             // API endpoint for the Gemini Pro model.
-            const GEMINI_API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${GEMINI_API_KEY}`;
-
+            const GEMINI_API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${GEMINI_API_KEY}`;
+    
             // Set the worker source for PDF.js to enable PDF parsing.
             pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-
+    
             // --- DOM ELEMENTS ---
             // Select all the necessary HTML elements for interaction.
             const chatMessages = document.getElementById('chat-messages');
@@ -419,13 +419,13 @@
             const resultsSection = document.getElementById('results-section');
             const recommendationsContainer = document.getElementById('recommendations-container');
             const cvUploadArea = document.getElementById('cv-upload-area');
-
+    
             // --- APPLICATION STATE ---
             // Variables to store the current state of the application.
             let userRules = []; // Stores parsed business rules.
             let uploadedCvs = []; // Stores extracted text from uploaded CVs.
-            let chatHistory = []; // Stores the conversation history for context.
-
+            let chatHistory = []; // Stores the conversation history for context and memory.
+    
             // --- PREDEFINED CATALOG ---
             // A list of available certifications for the AI to recommend.
             const certificateCatalog = [
@@ -439,7 +439,34 @@
             ];
             // Convert the catalog to a string for easy inclusion in prompts.
             const catalogString = certificateCatalog.map(c => `- ID: ${c.id}, Name: ${c.name}, Description: ${c.description}`).join('\n');
-
+    
+            // --- MEMORY FUNCTIONS ---
+            // Saves the current chat history to localStorage.
+            function saveChatHistory() {
+                try {
+                    localStorage.setItem('skillMatchChatHistory', JSON.stringify(chatHistory));
+                } catch (error) {
+                    console.error("Failed to save chat history to localStorage:", error);
+                }
+            }
+    
+            // Loads the chat history from localStorage when the page loads.
+            function loadChatHistory() {
+                const savedHistory = localStorage.getItem('skillMatchChatHistory');
+                if (savedHistory) {
+                    try {
+                        chatHistory = JSON.parse(savedHistory);
+                        // Display the loaded history in the chat UI.
+                        chatHistory.forEach(msg => {
+                            addMessage(msg.text, msg.isUser);
+                        });
+                    } catch (error) {
+                        console.error("Failed to parse chat history from localStorage:", error);
+                        chatHistory = []; // Reset to empty if parsing fails
+                    }
+                }
+            }
+    
             // --- HELPER FUNCTIONS ---
             // Adds a message to the chat interface.
             function addMessage(text, isUser = false) {
@@ -449,14 +476,14 @@
                 chatMessages.appendChild(messageDiv);
                 chatMessages.scrollTop = chatMessages.scrollHeight; // Auto-scroll to the latest message.
             }
-
+    
             // Updates the status message area (e.g., for upload or rule updates).
             function updateStatus(element, message, isError = false) {
                 element.innerHTML = `<div class="status-message ${isError ? 'status-error' : 'status-success'}">${message}</div>`;
                 // Automatically clear the status message after a few seconds.
                 setTimeout(() => { element.innerHTML = ''; }, 8000);
             }
-
+    
             // Shows a loading spinner with a message.
             function showLoading(element, message) {
                 element.innerHTML = `<div class="loader"></div>${message}`;
@@ -466,30 +493,39 @@
             function hideLoading(element) {
                 element.innerHTML = '';
             }
-
+    
             // --- CORE API CALL ---
-            // Asynchronously sends a prompt to the Gemini API and returns the text response.
-            async function callGeminiAPI(prompt) {
+            // Asynchronously sends a prompt and history to the Gemini API and returns the text response.
+            async function callGeminiAPI(prompt, history) {
+                // Format the history for the Gemini API
+                const formattedHistory = history.map(msg => ({
+                    role: msg.isUser ? "user" : "model",
+                    parts: [{ text: msg.text }]
+                }));
+    
                 const requestBody = {
-                    contents: [{ role: "user", parts: [{ text: prompt }] }]
+                    contents: [
+                        ...formattedHistory,
+                        { role: "user", parts: [{ text: prompt }] }
+                    ]
                 };
-
+    
                 const response = await fetch(GEMINI_API_URL, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(requestBody)
                 });
-
+    
                 // Handle API errors.
                 if (!response.ok) {
                     const errorData = await response.json();
                     throw new Error(`API Error: ${response.status} - ${errorData.error?.message || 'Unknown error'}`);
                 }
-
+    
                 const data = await response.json();
                 return data.candidates[0].content.parts[0].text;
             }
-
+    
             // --- FILE PROCESSING ---
             // Extracts text content from a file (PDF, DOCX, or TXT).
             async function extractTextFromFile(file) {
@@ -518,23 +554,32 @@
             }
             
             // --- EVENT LISTENERS ---
-
+    
             // Chat functionality
             sendButton.addEventListener('click', handleSendMessage);
             userInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') handleSendMessage(); });
-
+    
             // Handles sending a chat message to the AI.
             async function handleSendMessage() {
                 const message = userInput.value.trim();
                 if (!message) return;
-
-                addMessage(message, true); // Display user's message.
+    
+                // Add user message to UI and history
+                addMessage(message, true);
+                chatHistory.push({ text: message, isUser: true });
+                saveChatHistory(); // Save immediately after adding
+    
                 userInput.value = '';
                 sendButton.disabled = true;
-
+    
                 try {
-                    const response = await callGeminiAPI(message);
-                    addMessage(response); // Display AI's response.
+                    // Pass the current history to the API call for context
+                    const response = await callGeminiAPI(message, chatHistory);
+                    
+                    // Add bot response to UI and history
+                    addMessage(response);
+                    chatHistory.push({ text: response, isUser: false });
+                    saveChatHistory(); // Save immediately after adding
                 } catch (error) {
                     console.error("Chat API Error:", error);
                     addMessage("Sorry, I'm having trouble connecting. Please check the API key and my connection.");
@@ -542,7 +587,7 @@
                     sendButton.disabled = false;
                 }
             }
-
+    
             // File upload functionality
             cvUploadArea.addEventListener('click', () => fileInput.click()); // Trigger file input on click.
             cvUploadArea.addEventListener('dragover', (e) => { e.preventDefault(); cvUploadArea.style.borderColor = 'var(--primary)'; });
@@ -553,9 +598,9 @@
                 fileInput.files = e.dataTransfer.files; // Assign dropped files to the input.
                 handleFileSelect();
             });
-
+    
             fileInput.addEventListener('change', handleFileSelect);
-
+    
             // Handles file selection and updates the status.
             function handleFileSelect() {
                 uploadedCvs = []; // Reset previous selections.
@@ -566,7 +611,7 @@
                     uploadStatus.innerHTML = '';
                 }
             }
-
+    
             // Analyze CVs button click handler.
             analyzeButton.addEventListener('click', async () => {
                 const files = Array.from(fileInput.files);
@@ -574,11 +619,11 @@
                     updateStatus(uploadStatus, "Please select at least one CV file.", true);
                     return;
                 }
-
+    
                 showLoading(uploadStatus, "Extracting text from CVs...");
                 analyzeButton.disabled = true;
                 uploadedCvs = []; // Reset
-
+    
                 try {
                     // First, extract text from all uploaded files.
                     for (const file of files) {
@@ -592,68 +637,68 @@
                     
                     // Construct the detailed prompt for the AI.
                     const analysisPrompt = `
-You are an expert career counselor and training analyst. Analyze the provided CVs and recommend suitable training or certifications.
-
-**Catalog of Certifications:**
- ${catalogString}
-
-**Business Rules:**
- ${userRules.length > 0 ? userRules.map(r => `- ${r}`).join('\n') : 'No specific business rules provided.'}
-
-**CVs to Analyze:**
- ${uploadedCvs.map(cv => `--- CV for: ${cv.name} ---\n${cv.text}`).join('\n\n')}
-
-**Task:**
-For each CV, provide recommendations in a structured JSON format. The JSON must be an array of objects, where each object represents one candidate.
-
-**JSON Structure:**
-{
-  "candidates": [
+    You are an expert career counselor and training analyst. Analyze the provided CVs and recommend suitable training or certifications.
+    
+    **Catalog of Certifications:**
+     ${catalogString}
+    
+    **Business Rules:**
+     ${userRules.length > 0 ? userRules.map(r => `- ${r}`).join('\n') : 'No specific business rules provided.'}
+    
+    **CVs to Analyze:**
+     ${uploadedCvs.map(cv => `--- CV for: ${cv.name} ---\n${cv.text}`).join('\n\n')}
+    
+    **Task:**
+    For each CV, provide recommendations in a structured JSON format. The JSON must be an array of objects, where each object represents one candidate.
+    
+    **JSON Structure:**
     {
-      "candidateName": "Full Name of Candidate",
-      "recommendations": [
+      "candidates": [
         {
-          "certId": "pmp",
-          "certName": "Project Management Professional (PMP)",
-          "reason": "Clear explanation of why this certification is relevant.",
-          "rulesApplied": ["List of rules that influenced this recommendation"]
+          "candidateName": "Full Name of Candidate",
+          "recommendations": [
+            {
+              "certId": "pmp",
+              "certName": "Project Management Professional (PMP)",
+              "reason": "Clear explanation of why this certification is relevant.",
+              "rulesApplied": ["List of rules that influenced this recommendation"]
+            }
+          ]
         }
       ]
     }
-  ]
-}
-
-**Crucial Instructions:**
-- Respond with ONLY the JSON object. Do not include any introductory text, explanations, or markdown formatting like \`\`\`json.
-- The entire response must be a single, valid JSON object that can be parsed.
-- If no recommendations can be made for a candidate, provide an empty array for their "recommendations".
-                    `;
-                    
-                    console.log("--- DEBUG: Prompt sent to Gemini ---");
-                    console.log(analysisPrompt);
-
-                    // Call the API with the constructed prompt.
-                    const aiResponse = await callGeminiAPI(analysisPrompt);
-                    
-                    console.log("--- DEBUG: Raw response from Gemini ---");
-                    console.log(aiResponse);
-
-                    // Clean the response by removing potential markdown formatting.
-                    const cleanedResponse = aiResponse.replace(/```json\n?|\n?```/g, '').trim();
-                    
-                    let recommendations;
-                    try {
-                        // Parse the cleaned JSON response.
-                        recommendations = JSON.parse(cleanedResponse);
-                    } catch (parseError) {
-                        console.error("JSON Parsing Error:", parseError);
-                        throw new Error("The AI returned an invalid JSON format. Check the console for the raw response.");
-                    }
-
-                    // Display the parsed recommendations on the page.
-                    displayRecommendations(recommendations);
-                    updateStatus(uploadStatus, `Analysis complete for ${files.length} CV(s).`);
-
+    
+    **Crucial Instructions:**
+    - Respond with ONLY the JSON object. Do not include any introductory text, explanations, or markdown formatting like \`\`\`json.
+    - The entire response must be a single, valid JSON object that can be parsed.
+    - If no recommendations can be made for a candidate, provide an empty array for their "recommendations".
+                        `;
+                        
+                        console.log("--- DEBUG: Prompt sent to Gemini ---");
+                        console.log(analysisPrompt);
+    
+                        // For the analysis prompt, we don't need the full chat history, just the prompt itself.
+                        const aiResponse = await callGeminiAPI(analysisPrompt, []); 
+                        
+                        console.log("--- DEBUG: Raw response from Gemini ---");
+                        console.log(aiResponse);
+    
+                        // Clean the response by removing potential markdown formatting.
+                        const cleanedResponse = aiResponse.replace(/```json\n?|\n?```/g, '').trim();
+                        
+                        let recommendations;
+                        try {
+                            // Parse the cleaned JSON response.
+                            recommendations = JSON.parse(cleanedResponse);
+                        } catch (parseError) {
+                            console.error("JSON Parsing Error:", parseError);
+                            throw new Error("The AI returned an invalid JSON format. Check the console for the raw response.");
+                        }
+    
+                        // Display the parsed recommendations on the page.
+                        displayRecommendations(recommendations);
+                        updateStatus(uploadStatus, `Analysis complete for ${files.length} CV(s).`);
+    
                 } catch (error) {
                     console.error("Analysis Error:", error);
                     updateStatus(uploadStatus, `Failed to analyze CVs. Error: ${error.message}`, true);
@@ -662,7 +707,7 @@ For each CV, provide recommendations in a structured JSON format. The JSON must 
                     analyzeButton.disabled = false;
                 }
             });
-
+    
             // Business rules update button click handler.
             updateRulesButton.addEventListener('click', async () => {
                 const rulesText = rulesInput.value.trim();
@@ -670,28 +715,29 @@ For each CV, provide recommendations in a structured JSON format. The JSON must 
                     updateStatus(rulesStatus, "Please enter some rules before updating.", true);
                     return;
                 }
-
+    
                 showLoading(rulesStatus, "Parsing rules with AI...");
                 updateRulesButton.disabled = true;
-
+    
                 try {
                     // Construct a prompt to parse natural language rules into a structured format.
                     const ruleParsingPrompt = `
-You are a business rules engine parser. Read the user's natural language rules and convert them into a simple, structured JSON array of strings. Each string should be a clean, rephrased version of the user's rule.
-
-User's rules:
- ${rulesText}
-
-Respond with ONLY a JSON array of strings. Do not include any introductory text or markdown formatting.
-Example output: ["For PMP, candidate must have 5+ years of experience.", "For candidates with less than 2 years of experience, only recommend foundation-level certifications."]
-                    `;
-                    
-                    const aiResponse = await callGeminiAPI(ruleParsingPrompt);
-                    const cleanedResponse = aiResponse.replace(/```json\n?|\n?```/g, '').trim();
-                    userRules = JSON.parse(cleanedResponse); // Store the parsed rules.
-                    updateStatus(rulesStatus, `Successfully parsed and applied ${userRules.length} rules.`);
-                    addMessage(`I've updated my recommendation logic based on your new rules.`);
-
+    You are a business rules engine parser. Read the user's natural language rules and convert them into a simple, structured JSON array of strings. Each string should be a clean, rephrased version of the user's rule.
+    
+    User's rules:
+     ${rulesText}
+    
+    Respond with ONLY a JSON array of strings. Do not include any introductory text or markdown formatting.
+    Example output: ["For PMP, candidate must have 5+ years of experience.", "For candidates with less than 2 years of experience, only recommend foundation-level certifications."]
+                        `;
+                        
+                        // For the rule parsing prompt, we don't need the full chat history.
+                        const aiResponse = await callGeminiAPI(ruleParsingPrompt, []);
+                        const cleanedResponse = aiResponse.replace(/```json\n?|\n?```/g, '').trim();
+                        userRules = JSON.parse(cleanedResponse); // Store the parsed rules.
+                        updateStatus(rulesStatus, `Successfully parsed and applied ${userRules.length} rules.`);
+                        addMessage(`I've updated my recommendation logic based on your new rules.`);
+    
                 } catch (error) {
                     console.error("Rule Parsing Error:", error);
                     updateStatus(rulesStatus, `Failed to parse rules. Error: ${error.message}`, true);
@@ -700,7 +746,7 @@ Example output: ["For PMP, candidate must have 5+ years of experience.", "For ca
                     updateRulesButton.disabled = false;
                 }
             });
-
+    
             // --- UI RENDERING ---
             // Renders the AI's recommendations onto the webpage.
             function displayRecommendations(recommendations) {
@@ -718,7 +764,7 @@ Example output: ["For PMP, candidate must have 5+ years of experience.", "For ca
                         nameDiv.className = 'candidate-name';
                         nameDiv.textContent = candidate.candidateName || 'Candidate';
                         candidateDiv.appendChild(nameDiv);
-
+    
                         // Check if there are any recommendations for the candidate.
                         if (candidate.recommendations && candidate.recommendations.length > 0) {
                             candidate.recommendations.forEach(rec => {
@@ -740,10 +786,15 @@ Example output: ["For PMP, candidate must have 5+ years of experience.", "For ca
                 }
                 resultsSection.classList.remove('hidden'); // Make the results section visible.
             }
+            
+            // --- INITIALIZATION ---
+            // Load the chat history when the application starts.
+            loadChatHistory();
         });
     </script>
 </body>
 </html>
+
 
 
 
