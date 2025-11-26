@@ -320,8 +320,7 @@
         // --- CONFIGURATION ---
         // !!! IMPORTANT: REPLACE 'YOUR_GEMINI_API_KEY' WITH YOUR ACTUAL API KEY !!!
         const GEMINI_API_KEY = 'AIzaSyAs7r0GPX-cO_WT7oW_GFlTZqygWULdsXw';
-        const GEMINI_API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${GEMINI_API_KEY}`;
-
+        const GEMINI_API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${GEMINI_API_KEY}`;
         // Set the worker for PDF.js
         pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
@@ -639,3 +638,4 @@ Example output: ["For PMP, candidate must have 5+ years of experience.", "For ca
 </body>
 
 </html>
+
