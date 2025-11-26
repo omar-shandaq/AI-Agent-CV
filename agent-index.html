@@ -314,308 +314,328 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
 
-    <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            // --- CONFIGURATION ---
-            // !!! IMPORTANT: REPLACE 'YOUR_GEMINI_API_KEY' WITH YOUR ACTUAL API KEY !!!
-            const GEMINI_API_KEY = 'AIzaSyAs7r0GPX-cO_WT7oW_GFlTZqygWULdsXw';
-            const GEMINI_API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${GEMINI_API_KEY}`;
+   <!-- Keep all the HTML and CSS from before, but replace the entire <script> section with this one. -->
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // --- CONFIGURATION ---
+        // !!! IMPORTANT: REPLACE 'YOUR_GEMINI_API_KEY' WITH YOUR ACTUAL API KEY !!!
+        const GEMINI_API_KEY = 'AIzaSyAs7r0GPX-cO_WT7oW_GFlTZqygWULdsXw';
+        const GEMINI_API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${GEMINI_API_KEY}`;
 
-            // Set the worker for PDF.js
-            pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+        // Set the worker for PDF.js
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
-            // --- DOM ELEMENTS ---
-            const chatMessages = document.getElementById('chat-messages');
-            const userInput = document.getElementById('user-input');
-            const sendButton = document.getElementById('send-button');
-            const fileInput = document.getElementById('file-input');
-            const analyzeButton = document.getElementById('analyze-button');
-            const rulesInput = document.getElementById('rules-input');
-            const updateRulesButton = document.getElementById('update-rules');
-            const uploadStatus = document.getElementById('upload-status');
-            const rulesStatus = document.getElementById('rules-status');
-            const resultsSection = document.getElementById('results-section');
-            const recommendationsContainer = document.getElementById('recommendations-container');
-            const cvUploadArea = document.getElementById('cv-upload-area');
+        // --- DOM ELEMENTS ---
+        const chatMessages = document.getElementById('chat-messages');
+        const userInput = document.getElementById('user-input');
+        const sendButton = document.getElementById('send-button');
+        const fileInput = document.getElementById('file-input');
+        const analyzeButton = document.getElementById('analyze-button');
+        const rulesInput = document.getElementById('rules-input');
+        const updateRulesButton = document.getElementById('update-rules');
+        const uploadStatus = document.getElementById('upload-status');
+        const rulesStatus = document.getElementById('rules-status');
+        const resultsSection = document.getElementById('results-section');
+        const recommendationsContainer = document.getElementById('recommendations-container');
+        const cvUploadArea = document.getElementById('cv-upload-area');
 
-            // --- APPLICATION STATE ---
-            let userRules = [];
-            let uploadedCvs = []; // Stores { name, text }
-            let chatHistory = [];
+        // --- APPLICATION STATE ---
+        let userRules = [];
+        let uploadedCvs = []; // Stores { name, text }
+        let chatHistory = [];
 
-            // --- PREDEFINED CATALOG ---
-            const certificateCatalog = [
-                { id: 'pmp', name: 'Project Management Professional (PMP)', description: 'Globally recognized project management certification for experienced project managers.' },
-                { id: 'itil', name: 'ITIL Foundation', description: 'Entry-level certification for IT service management (ITSM).' },
-                { id: 'aws_saa', name: 'AWS Certified Solutions Architect - Associate', description: 'Certification for designing distributed systems on AWS.' },
-                { id: 'csm', name: 'Certified ScrumMaster (CSM)', description: 'Certification for adopting the Scrum framework for agile project management.' },
-                { id: 'ccna', name: 'Cisco Certified Network Associate (CCNA)', description: ' foundational certification for networking skills and Cisco technologies.' },
-                { id: 'gcp_ace', name: 'Google Cloud Associate Cloud Engineer', description: 'Certification for deploying applications, monitoring projects, and maintaining enterprise projects on Google Cloud.' },
-                { id: 'azure_admin', name: 'Microsoft Certified: Azure Administrator Associate', description: 'Certification for implementing, monitoring, and maintaining Microsoft Azure solutions.' }
-            ];
-            const catalogString = certificateCatalog.map(c => `- ID: ${c.id}, Name: ${c.name}, Description: ${c.description}`).join('\n');
+        // --- PREDEFINED CATALOG ---
+        const certificateCatalog = [
+            { id: 'pmp', name: 'Project Management Professional (PMP)', description: 'Globally recognized project management certification for experienced project managers.' },
+            { id: 'itil', name: 'ITIL Foundation', description: 'Entry-level certification for IT service management (ITSM).' },
+            { id: 'aws_saa', name: 'AWS Certified Solutions Architect - Associate', description: 'Certification for designing distributed systems on AWS.' },
+            { id: 'csm', name: 'Certified ScrumMaster (CSM)', description: 'Certification for adopting the Scrum framework for agile project management.' },
+            { id: 'ccna', name: 'Cisco Certified Network Associate (CCNA)', description: 'Foundational certification for networking skills and Cisco technologies.' },
+            { id: 'gcp_ace', name: 'Google Cloud Associate Cloud Engineer', description: 'Certification for deploying applications, monitoring projects, and maintaining enterprise projects on Google Cloud.' },
+            { id: 'azure_admin', name: 'Microsoft Certified: Azure Administrator Associate', description: 'Certification for implementing, monitoring, and maintaining Microsoft Azure solutions.' }
+        ];
+        const catalogString = certificateCatalog.map(c => `- ID: ${c.id}, Name: ${c.name}, Description: ${c.description}`).join('\n');
 
-            // --- HELPER FUNCTIONS ---
-            function addMessage(text, isUser = false) {
-                const messageDiv = document.createElement('div');
-                messageDiv.className = `message ${isUser ? 'user-message' : 'bot-message'}`;
-                messageDiv.innerHTML = text.replace(/\n/g, '<br>'); // Allow for line breaks in bot messages
-                chatMessages.appendChild(messageDiv);
-                chatMessages.scrollTop = chatMessages.scrollHeight;
+        // --- HELPER FUNCTIONS ---
+        function addMessage(text, isUser = false) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${isUser ? 'user-message' : 'bot-message'}`;
+            messageDiv.innerHTML = text.replace(/\n/g, '<br>');
+            chatMessages.appendChild(messageDiv);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+
+        function updateStatus(element, message, isError = false) {
+            element.innerHTML = `<div class="status-message ${isError ? 'status-error' : 'status-success'}">${message}</div>`;
+            setTimeout(() => { element.innerHTML = ''; }, 8000); // Clear status after 8 seconds
+        }
+
+        function showLoading(element, message) {
+            element.innerHTML = `<div class="loader"></div>${message}`;
+        }
+        
+        function hideLoading(element) {
+            element.innerHTML = '';
+        }
+
+        // --- CORE API CALL ---
+        async function callGeminiAPI(prompt) {
+            const requestBody = {
+                contents: [{ role: "user", parts: [{ text: prompt }] }]
+            };
+
+            const response = await fetch(GEMINI_API_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(requestBody)
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(`API Error: ${response.status} - ${errorData.error?.message || 'Unknown error'}`);
             }
 
-            function updateStatus(element, message, isError = false) {
-                element.innerHTML = `<div class="status-message ${isError ? 'status-error' : 'status-success'}">${message}</div>`;
-                setTimeout(() => { element.innerHTML = ''; }, 5000); // Clear status after 5 seconds
-            }
+            const data = await response.json();
+            return data.candidates[0].content.parts[0].text;
+        }
 
-            function showLoading(element, message) {
-                element.innerHTML = `<div class="loader"></div>${message}`;
-            }
-            
-            function hideLoading(element) {
-                element.innerHTML = '';
-            }
-
-            // --- CORE API CALL ---
-            async function callGeminiAPI(prompt, history = []) {
-                const requestBody = {
-                    contents: [
-                        ...history,
-                        { role: "user", parts: [{ text: prompt }] }
-                    ]
-                };
-
-                const response = await fetch(GEMINI_API_URL, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(requestBody)
-                });
-
-                if (!response.ok) {
-                    const errorData = await response.json();
-                    throw new Error(`API Error: ${response.status} - ${errorData.error?.message || 'Unknown error'}`);
+        // --- FILE PROCESSING ---
+        async function extractTextFromFile(file) {
+            if (file.type === 'application/pdf') {
+                const dataBuffer = await file.arrayBuffer();
+                const pdf = await pdfjsLib.getDocument(dataBuffer).promise;
+                let fullText = '';
+                for (let i = 1; i <= pdf.numPages; i++) {
+                    const page = await pdf.getPage(i);
+                    const textContent = await page.getTextContent();
+                    const pageText = textContent.items.map(item => item.str).join(' ');
+                    fullText += pageText + '\n';
                 }
+                return fullText;
+            } else if (file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
+                const arrayBuffer = await file.arrayBuffer();
+                const result = await mammoth.extractRawText({ arrayBuffer });
+                return result.value;
+            } else if (file.type === 'text/plain') {
+                return await file.text();
+            }
+            throw new Error(`Unsupported file type: ${file.type}`);
+        }
+        
+        // --- EVENT LISTENERS ---
 
-                const data = await response.json();
-                const botResponse = data.candidates[0].content.parts[0].text;
+        // Chat functionality
+        sendButton.addEventListener('click', handleSendMessage);
+        userInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') handleSendMessage(); });
+
+        async function handleSendMessage() {
+            const message = userInput.value.trim();
+            if (!message) return;
+
+            addMessage(message, true);
+            userInput.value = '';
+            sendButton.disabled = true;
+
+            try {
+                const response = await callGeminiAPI(message);
+                addMessage(response);
+            } catch (error) {
+                console.error("Chat API Error:", error);
+                addMessage("Sorry, I'm having trouble connecting. Please check the API key and my connection.");
+            } finally {
+                sendButton.disabled = false;
+            }
+        }
+
+        // File upload functionality
+        cvUploadArea.addEventListener('click', () => fileInput.click());
+        cvUploadArea.addEventListener('dragover', (e) => { e.preventDefault(); cvUploadArea.style.borderColor = 'var(--primary)'; });
+        cvUploadArea.addEventListener('dragleave', () => { cvUploadArea.style.borderColor = 'var(--border-color)'; });
+        cvUploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            cvUploadArea.style.borderColor = 'var(--border-color)';
+            fileInput.files = e.dataTransfer.files;
+            handleFileSelect();
+        });
+
+        fileInput.addEventListener('change', handleFileSelect);
+
+        function handleFileSelect() {
+            uploadedCvs = [];
+            const files = Array.from(fileInput.files);
+            if (files.length > 0) {
+                updateStatus(uploadStatus, `Selected ${files.length} file(s): ${files.map(f => f.name).join(', ')}`);
+            } else {
+                uploadStatus.innerHTML = '';
+            }
+        }
+
+        // Analyze CVs
+        analyzeButton.addEventListener('click', async () => {
+            const files = Array.from(fileInput.files);
+            if (files.length === 0) {
+                updateStatus(uploadStatus, "Please select at least one CV file.", true);
+                return;
+            }
+
+            showLoading(uploadStatus, "Extracting text from CVs...");
+            analyzeButton.disabled = true;
+            uploadedCvs = []; // Reset
+
+            try {
+                for (const file of files) {
+                    const text = await extractTextFromFile(file);
+                    console.log(`--- DEBUG: Extracted text from ${file.name} ---`);
+                    console.log(text);
+                    uploadedCvs.push({ name: file.name, text: text });
+                }
                 
-                // Update history for context in subsequent calls
-                history.push({ role: "user", parts: [{ text: prompt }] });
-                history.push({ role: "model", parts: [{ text: botResponse }] });
+                showLoading(uploadStatus, "Analyzing CVs with AI...");
                 
-                return botResponse;
-            }
+                // *** REVISED AND MORE ROBUST PROMPT ***
+                const analysisPrompt = `
+You are an expert career counselor and training analyst. Analyze the provided CVs and recommend suitable training or certifications.
 
-            // --- FILE PROCESSING ---
-            async function extractTextFromFile(file) {
-                if (file.type === 'application/pdf') {
-                    const dataBuffer = await file.arrayBuffer();
-                    const pdf = await pdfjsLib.getDocument(dataBuffer).promise;
-                    let fullText = '';
-                    for (let i = 1; i <= pdf.numPages; i++) {
-                        const page = await pdf.getPage(i);
-                        const textContent = await page.getTextContent();
-                        const pageText = textContent.items.map(item => item.str).join(' ');
-                        fullText += pageText + '\n';
-                    }
-                    return fullText;
-                } else if (file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
-                    const arrayBuffer = await file.arrayBuffer();
-                    const result = await mammoth.extractRawText({ arrayBuffer });
-                    return result.value;
-                } else if (file.type === 'text/plain') {
-                    return await file.text();
-                }
-                throw new Error(`Unsupported file type: ${file.type}`);
-            }
-            
-            // --- EVENT LISTENERS ---
+**Catalog of Certifications:**
+ ${catalogString}
 
-            // Chat functionality
-            sendButton.addEventListener('click', handleSendMessage);
-            userInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') handleSendMessage(); });
+**Business Rules:**
+ ${userRules.length > 0 ? userRules.map(r => `- ${r}`).join('\n') : 'No specific business rules provided.'}
 
-            async function handleSendMessage() {
-                const message = userInput.value.trim();
-                if (!message) return;
+**CVs to Analyze:**
+ ${uploadedCvs.map(cv => `--- CV for: ${cv.name} ---\n${cv.text}`).join('\n\n')}
 
-                addMessage(message, true);
-                userInput.value = '';
-                sendButton.disabled = true;
+**Task:**
+For each CV, provide recommendations in a structured JSON format. The JSON must be an array of objects, where each object represents one candidate.
 
+**JSON Structure:**
+{
+  "candidates": [
+    {
+      "candidateName": "Full Name of Candidate",
+      "recommendations": [
+        {
+          "certId": "pmp",
+          "certName": "Project Management Professional (PMP)",
+          "reason": "Clear explanation of why this certification is relevant.",
+          "rulesApplied": ["List of rules that influenced this recommendation"]
+        }
+      ]
+    }
+  ]
+}
+
+**Crucial Instructions:**
+- Respond with ONLY the JSON object. Do not include any introductory text, explanations, or markdown formatting like \`\`\`json.
+- The entire response must be a single, valid JSON object that can be parsed.
+- If no recommendations can be made for a candidate, provide an empty array for their "recommendations".
+                `;
+                
+                console.log("--- DEBUG: Prompt sent to Gemini ---");
+                console.log(analysisPrompt);
+
+                const aiResponse = await callGeminiAPI(analysisPrompt);
+                
+                console.log("--- DEBUG: Raw response from Gemini ---");
+                console.log(aiResponse);
+
+                // A common issue is the AI adding markdown backticks. Let's try to clean it.
+                const cleanedResponse = aiResponse.replace(/```json\n?|\n?```/g, '').trim();
+                
+                let recommendations;
                 try {
-                    const response = await callGeminiAPI(message, chatHistory);
-                    addMessage(response);
-                } catch (error) {
-                    console.error("Chat API Error:", error);
-                    addMessage("Sorry, I'm having trouble connecting to my brain right now. Please check the API key and try again.");
-                } finally {
-                    sendButton.disabled = false;
-                }
-            }
-
-            // File upload functionality
-            cvUploadArea.addEventListener('click', () => fileInput.click());
-            cvUploadArea.addEventListener('dragover', (e) => { e.preventDefault(); cvUploadArea.style.borderColor = 'var(--primary)'; });
-            cvUploadArea.addEventListener('dragleave', () => { cvUploadArea.style.borderColor = 'var(--border-color)'; });
-            cvUploadArea.addEventListener('drop', (e) => {
-                e.preventDefault();
-                cvUploadArea.style.borderColor = 'var(--border-color)';
-                fileInput.files = e.dataTransfer.files;
-                handleFileSelect();
-            });
-
-            fileInput.addEventListener('change', handleFileSelect);
-
-            function handleFileSelect() {
-                uploadedCvs = []; // Reset previous selections
-                const files = Array.from(fileInput.files);
-                if (files.length > 0) {
-                    updateStatus(uploadStatus, `Selected ${files.length} file(s): ${files.map(f => f.name).join(', ')}`);
-                } else {
-                    uploadStatus.innerHTML = '';
-                }
-            }
-
-            // Analyze CVs
-            analyzeButton.addEventListener('click', async () => {
-                const files = Array.from(fileInput.files);
-                if (files.length === 0) {
-                    updateStatus(uploadStatus, "Please select at least one CV file.", true);
-                    return;
+                    recommendations = JSON.parse(cleanedResponse);
+                } catch (parseError) {
+                    console.error("JSON Parsing Error:", parseError);
+                    throw new Error("The AI returned an invalid JSON format. Check the console for the raw response.");
                 }
 
-                showLoading(uploadStatus, "Extracting text from CVs...");
-                analyzeButton.disabled = true;
+                displayRecommendations(recommendations);
+                updateStatus(uploadStatus, `Analysis complete for ${files.length} CV(s).`);
 
-                try {
-                    for (const file of files) {
-                        const text = await extractTextFromFile(file);
-                        uploadedCvs.push({ name: file.name, text: text });
-                    }
-                    
-                    showLoading(uploadStatus, "Analyzing CVs with AI...");
-                    const analysisPrompt = `
-                        You are an expert career counselor and training analyst. Analyze the provided CVs and recommend suitable training or certifications.
-                        
-                        Here is the catalog of available certifications:
-                        ${catalogString}
-                        
-                        Here are the business rules to follow:
-                        ${userRules.length > 0 ? userRules.map(r => `- ${r}`).join('\n') : 'No specific business rules provided.'}
-                        
-                        Here are the CVs to analyze:
-                        ${uploadedCvs.map(cv => `--- CV for: ${cv.name} ---\n${cv.text}`).join('\n\n')}
-                        
-                        For each CV, provide recommendations in a structured JSON format. The JSON should be an array of objects, where each object represents one candidate. Each candidate object should have:
-                        - "candidateName": The name of the candidate.
-                        - "recommendations": An array of recommendation objects. Each recommendation object must have:
-                            - "certId": The ID of the certification from the catalog.
-                            - "certName": The full name of the certification.
-                            - "reason": A clear explanation of why this certification is relevant to the candidate's profile.
-                            - "rulesApplied": An array of strings, listing any business rules that specifically influenced this recommendation. If no rules applied, this should be an empty array [].
-
-                        **Crucial Instructions:**
-                        - Respond with ONLY the JSON array. Do not include any introductory text, explanations, or markdown formatting like \`\`\`json.
-                        - Ensure the output is valid, parseable JSON.
-                    `;
-                    
-                    const aiResponse = await callGeminiAPI(analysisPrompt);
-                    const recommendations = JSON.parse(aiResponse);
-                    displayRecommendations(recommendations);
-                    updateStatus(uploadStatus, `Analysis complete for ${files.length} CV(s).`);
-
-                } catch (error) {
-                    console.error("Analysis Error:", error);
-                    updateStatus(uploadStatus, `Failed to analyze CVs. Error: ${error.message}`, true);
-                } finally {
-                    hideLoading(uploadStatus);
-                    analyzeButton.disabled = false;
-                }
-            });
-
-            // Business rules
-            updateRulesButton.addEventListener('click', async () => {
-                const rulesText = rulesInput.value.trim();
-                if (!rulesText) {
-                    updateStatus(rulesStatus, "Please enter some rules before updating.", true);
-                    return;
-                }
-
-                showLoading(rulesStatus, "Parsing rules with AI...");
-                updateRulesButton.disabled = true;
-
-                try {
-                    const ruleParsingPrompt = `
-                        You are a business rules engine parser. Your task is to read the natural language rules provided by the user and convert them into a simple, structured format. For each rule, identify the target certification and the condition.
-                        
-                        Available Certification IDs are: ${certificateCatalog.map(c => c.id).join(', ')}.
-                        
-                        User's rules:
-                        ${rulesText}
-                        
-                        Please process these rules and return a JSON array of strings, where each string is a clean, rephrased version of the user's rule. If a rule is too vague or cannot be applied, you may omit it.
-                        
-                        Example:
-                        User input: "Recommend PMP only if the candidate has 5+ years of experience."
-                        Output: ["For PMP, candidate must have 5+ years of experience."]
-
-                        User input: "If experience < 2 years, recommend Foundation-level courses only."
-                        Output: ["For candidates with less than 2 years of experience, only recommend foundation-level certifications like ITIL."]
-
-                        Respond with ONLY the JSON array. No extra text.
-                    `;
-                    
-                    const aiResponse = await callGeminiAPI(ruleParsingPrompt);
-                    userRules = JSON.parse(aiResponse);
-                    updateStatus(rulesStatus, `Successfully parsed and applied ${userRules.length} rules.`);
-                    addMessage(`I've updated my recommendation logic based on your new rules.`);
-
-                } catch (error) {
-                    console.error("Rule Parsing Error:", error);
-                    updateStatus(rulesStatus, `Failed to parse rules. Error: ${error.message}`, true);
-                } finally {
-                    hideLoading(rulesStatus);
-                    updateRulesButton.disabled = false;
-                }
-            });
-
-            // --- UI RENDERING ---
-            function displayRecommendations(recommendations) {
-                recommendationsContainer.innerHTML = '';
-                if (!recommendations || recommendations.length === 0) {
-                    recommendationsContainer.innerHTML = '<p>No recommendations could be generated. Please check the CVs and try again.</p>';
-                } else {
-                    recommendations.forEach(candidate => {
-                        const candidateDiv = document.createElement('div');
-                        candidateDiv.className = 'candidate-result';
-                        
-                        const nameDiv = document.createElement('h3');
-                        nameDiv.className = 'candidate-name';
-                        nameDiv.textContent = candidate.candidateName || 'Candidate';
-                        candidateDiv.appendChild(nameDiv);
-
-                        if (candidate.recommendations && candidate.recommendations.length > 0) {
-                            candidate.recommendations.forEach(rec => {
-                                const card = document.createElement('div');
-                                card.className = 'recommendation-card';
-                                card.innerHTML = `
-                                    <div class="recommendation-title">${rec.certName}</div>
-                                    <div class="recommendation-reason"><i class="fas fa-lightbulb"></i> ${rec.reason}</div>
-                                    ${rec.rulesApplied && rec.rulesApplied.length > 0 ? `<div class="recommendation-rule"><i class="fas fa-gavel"></i> Rules Applied: ${rec.rulesApplied.join(', ')}</div>` : ''}
-                                `;
-                                candidateDiv.appendChild(card);
-                            });
-                        } else {
-                            candidateDiv.innerHTML += '<p>No specific recommendations found for this candidate based on the current rules and catalog.</p>';
-                        }
-                        recommendationsContainer.appendChild(candidateDiv);
-                    });
-                }
-                resultsSection.classList.remove('hidden');
+            } catch (error) {
+                console.error("Analysis Error:", error);
+                updateStatus(uploadStatus, `Failed to analyze CVs. Error: ${error.message}`, true);
+            } finally {
+                hideLoading(uploadStatus);
+                analyzeButton.disabled = false;
             }
         });
-    </script>
+
+        // Business rules
+        updateRulesButton.addEventListener('click', async () => {
+            const rulesText = rulesInput.value.trim();
+            if (!rulesText) {
+                updateStatus(rulesStatus, "Please enter some rules before updating.", true);
+                return;
+            }
+
+            showLoading(rulesStatus, "Parsing rules with AI...");
+            updateRulesButton.disabled = true;
+
+            try {
+                const ruleParsingPrompt = `
+You are a business rules engine parser. Read the user's natural language rules and convert them into a simple, structured JSON array of strings. Each string should be a clean, rephrased version of the user's rule.
+
+User's rules:
+ ${rulesText}
+
+Respond with ONLY a JSON array of strings. Do not include any introductory text or markdown formatting.
+Example output: ["For PMP, candidate must have 5+ years of experience.", "For candidates with less than 2 years of experience, only recommend foundation-level certifications."]
+                `;
+                
+                const aiResponse = await callGeminiAPI(ruleParsingPrompt);
+                const cleanedResponse = aiResponse.replace(/```json\n?|\n?```/g, '').trim();
+                userRules = JSON.parse(cleanedResponse);
+                updateStatus(rulesStatus, `Successfully parsed and applied ${userRules.length} rules.`);
+                addMessage(`I've updated my recommendation logic based on your new rules.`);
+
+            } catch (error) {
+                console.error("Rule Parsing Error:", error);
+                updateStatus(rulesStatus, `Failed to parse rules. Error: ${error.message}`, true);
+            } finally {
+                hideLoading(rulesStatus);
+                updateRulesButton.disabled = false;
+            }
+        });
+
+        // --- UI RENDERING ---
+        function displayRecommendations(recommendations) {
+            recommendationsContainer.innerHTML = '';
+            // Check if the expected structure exists
+            if (!recommendations || !recommendations.candidates || recommendations.candidates.length === 0) {
+                recommendationsContainer.innerHTML = '<p>No recommendations could be generated. Please check the CVs, rules, and the developer console for errors.</p>';
+            } else {
+                recommendations.candidates.forEach(candidate => {
+                    const candidateDiv = document.createElement('div');
+                    candidateDiv.className = 'candidate-result';
+                    
+                    const nameDiv = document.createElement('h3');
+                    nameDiv.className = 'candidate-name';
+                    nameDiv.textContent = candidate.candidateName || 'Candidate';
+                    candidateDiv.appendChild(nameDiv);
+
+                    if (candidate.recommendations && candidate.recommendations.length > 0) {
+                        candidate.recommendations.forEach(rec => {
+                            const card = document.createElement('div');
+                            card.className = 'recommendation-card';
+                            card.innerHTML = `
+                                <div class="recommendation-title">${rec.certName}</div>
+                                <div class="recommendation-reason"><i class="fas fa-lightbulb"></i> ${rec.reason}</div>
+                                ${rec.rulesApplied && rec.rulesApplied.length > 0 ? `<div class="recommendation-rule"><i class="fas fa-gavel"></i> Rules Applied: ${rec.rulesApplied.join(', ')}</div>` : ''}
+                            `;
+                            candidateDiv.appendChild(card);
+                        });
+                    } else {
+                        candidateDiv.innerHTML += '<p>No specific recommendations found for this candidate based on the current rules and catalog.</p>';
+                    }
+                    recommendationsContainer.appendChild(candidateDiv);
+                });
+            }
+            resultsSection.classList.remove('hidden');
+        }
+    });
+</script>
 </body>
+
 </html>
